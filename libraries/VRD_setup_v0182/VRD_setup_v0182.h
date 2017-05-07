@@ -4,7 +4,7 @@
  *	to set up the Arduino-mediated comunication.
  *
  *  Created by Hannah Haberkern on 4/5/12.
- *  Copyright 2012 ETH Zürich. All rights reserved.
+ *  Updated 07/05/2017 by Hannah Haberkern
  *
  */
 
@@ -13,7 +13,7 @@
 #include <SPI.h>// include the SPI library code
 //#include <Arduino.h>
 
-class VRiD_VRsetup
+class VRD_setup
 	{
 	public:
 		

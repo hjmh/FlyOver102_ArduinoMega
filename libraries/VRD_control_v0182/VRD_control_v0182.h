@@ -4,9 +4,7 @@
  *  communication from the VR and Data PC
  *
  *  Created by Hannah Haberkern on 4/5/12.
- *  Copyright 2012 ETH Zürich. All rights reserved.
- *
- *  Updated 19/11/2015 by Hannah
+ *  Updated 07/05/2017 by Hannah Haberkern
  *
  */
 
@@ -38,14 +36,8 @@ class VRD_control
 		int baslerOn();
 		int baslerOff();
 		
-		int laserOn(int dutyCycle);
-		int laserOff();
-		
-		//int punishZone(uint8_t zoneSpec, int zoneDutyCycle);
-		
-		//int checkTimeOut();
-		//int startTimeOutTimer();
-		//int resetTimeOutTimer();
+		int optLEDOn(int dutyCycle);
+		int optLEDOff();
 		
 		void dac2Write(uint8_t dac, int16_t value);
 		
@@ -53,7 +45,7 @@ class VRD_control
 	  //variables
 		int _dacScreenLED;
 		int _dacBasler;
-		int _dacIRLaser;
+		int _dacOptLED;
 
 		int _dac2pin;
 		

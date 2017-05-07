@@ -3,7 +3,7 @@
  *  Includes all parameter declarations and initializations
  *
  *  Created by Hannah Haberkern on 7/24/12.
- *  Copyright 2012 ETH Zürich. All rights reserved.
+ *  Updated 07/05/2017 by Hannah Haberkern
  *
  */
 
@@ -35,4 +35,10 @@ int dac2pin = 48;// Chip select pins used with the SPI interface
 //Dac outputs
 int dacScreenLED = 0; //dac2Write(0, 32767) is to turn on the LED lights
 int dacBasler = 2;    //dac2Write(2, 32767) is for the Basler
-int dacIRLaser = 7;   //analogWrite(7, 0); is to turn the IR light on, Port 7 or '1' on the Arduino, PWM
+int dacOptLED = 7;   //analogWrite(7, 0); is to turn the optogenetic stimulation light on, Port 7 or '1' on the Arduino, PWM
+
+//----------------------------------------------------------------------
+// Miscellaneous
+//----------------------------------------------------------------------
+String FO_terminationString = "Trial_Ended"; //message printed by FlyOver when trial is terminated at end of trial time
+int optLEDTest_dutyCycle = 50; //for optLED positioning

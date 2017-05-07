@@ -2,10 +2,18 @@
  *  VRD_setup_v0182.cpp
  *    --> runs with Arduino version 1.8.2
  *
- *  Created by Hannah Haberkern on 4/6/12.
- *  Copyright 2012 ETH Zürich. All rights reserved.
+ *  Created by Hannah Haberkern on 4/5/12.
+ *  Updated 07/05/2017 by Hannah Haberkern
  *
  */
+
+
+/* TODO:
+	* check if SPI library is installed
+	* replace functions from serial_tx.ino (obsolete) with 
+	  functions from Arduino's serial library
+*/
+
 
 #ifndef VRD_setup_cpp
 #define VRD_setup_cpp

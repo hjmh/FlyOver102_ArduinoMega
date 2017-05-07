@@ -1,25 +1,26 @@
   /*
-   *  FlyOver094_Arduino.cpp
+   *  FlyOver102_ArduinoMega.cpp
    *
-   *  Arduino protocol to be combined with FlyOver version from June 2013
+   *  Arduino protocol to be combined with FlyOver version 1.02
    *      - FlyOver controls trial time and writes FlyOver & Treadmill data to file
    *      - Arduino receives reduced data stream (at about 360Hz) containing positional information
    *          of fly in the VR as well as event information
-   *      - Arduino parses though this input stream, initiates adequate laser punishment and outputs
-   *          initiated punishment events to the second serial connection (-> PC2, Serial logger))
+   *      - Arduino parses though this input stream, initiates adequate optogenetics stimulus (optLED) and outputs
+   *          initiated stimulation events to the second serial connection (-> PC2, Serial logger))
    *
-   *  Created by Hannah Haberkern on 14/12/15.
+   *  Created by Hannah Haberkern on 14/12/15, updated 2017.
    *
    */
   
   #ifndef VRD_ArduinoMain_h
   #define VRD_ArduinoMain_h
   #include <SPI.h>// include the SPI library code
+  //#include <SoftwareSerial.h>
   #include <VRD_setup_v0182.h> // include library for setting up the communication etc.
   #include <VRD_control_v0182.h> // include library for control of VR setup
   #include <VRD_Arduino_ExpParams.h> // include parameter declarations and initializations
 
-  #define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
+  // #define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
   
   //Define constants to be used later in the experiment
   #define CALIBRATION_HZ 500.00 //Hz of your frame trigger pulses
@@ -35,23 +36,30 @@
   //----------------------------------------------------------------------
   int stateScreens = 0;	//screens OFF (1 == ON)
   int stateBasler = 0;	//basler cameras OFF (1 == ON)
-  int stateLaser = 0;		//laser OFF (1 == ON, 2)
+  int stateOpt = 0;	//optLED OFF (1 == ON)
   
   int stateCalibration = 0; //performing calibration? Ignore input from VRPC
   int stateFlyOverTrial = 0; //is currently an experiment running?
   
-  String FO_terminationString = "Trial_Ended"; //message printed by FlyOver when trial is terminated at end of trial time
-  
   int newCharRead = 0;
   
-  int laserTest_dutyCycle = 50; //for laser positioning
+  //----------------------------------------------------------------------
+  // Choose pins for software serials (Serial2 and Serial3)
+  //----------------------------------------------------------------------
+  /* Note: Not all pins on the Mega and Mega 2560 support change interrupts, so only the following can be used for RX:
+           10, 11, 12, 13, 50, 51, 52, 53, 62, 63, 64, 65, 66, 67, 68, 69
+  int rx_Serial2 = 10; // RX is digital pin 10 (connect to TX of other device)
+  int tx_Serial2 = 9; // TX is digital pin 9 (connect to RX of other device)
+  int rx_Serial3 = 12;
+  int tx_Serial3 = 11;
+  */
   
   //==================================================================================================
-  // Instanciate objects from VRsetup class and VRcontrol class and VRiD_LaserGradient class
+  // Instanciate objects from VRsetup class and VRcontrol class
   
   VRD_setup VRsetup(lowestPin, highestPin, dac2pin);
-  VRD_control VRcontrol_DataPC(timeOutInterval_DataPC, dacScreenLED, dacBasler, dacIRLaser, CALIBRATION_HZ, CALIBRATION_PULSE_TIME, dac2pin);
-  VRD_control VRcontrol_VRPC(timeOutInterval_VRPC, dacScreenLED, dacBasler, dacIRLaser, CALIBRATION_HZ, CALIBRATION_PULSE_TIME, dac2pin);
+  VRD_control VRcontrol_DataPC(timeOutInterval_DataPC, dacScreenLED, dacBasler, dacOptLED, CALIBRATION_HZ, CALIBRATION_PULSE_TIME, dac2pin);
+  VRD_control VRcontrol_VRPC(timeOutInterval_VRPC, dacScreenLED, dacBasler, dacOptLED, CALIBRATION_HZ, CALIBRATION_PULSE_TIME, dac2pin);
   
   //==================================================================================================
   void setup() {
@@ -61,7 +69,7 @@
            --> with the VRPC (FO input)
            --> with DataPC (Matlab communication during calibration)
            --> with DataPC (Serial logger to write Arduino event data to file)
-       - intialize Basler, IR laser, screens
+       - intialize Basler, optogenetics LED, screens
        - set a couple of boolean flags..
     */
       
@@ -77,7 +85,7 @@
     //-------------------------------------------------------------
     //Data PC control..............................................
     // initialize private variables
-    VRcontrol_DataPC.initializeDacVariables(dacScreenLED, dacBasler, dacIRLaser);
+    VRcontrol_DataPC.initializeDacVariables(dacScreenLED, dacBasler, dacOptLED);
   	
     //Serial port for sending out data to Data PC (to be looged by SerialLogger.exe)
     //  --> this is a more reliable way of logging Arduino data and should be used during trials
@@ -87,19 +95,20 @@
     //-------------------------------------------------------------
     //VR PC control................................................
     // initialize private variables
-    VRcontrol_VRPC.initializeDacVariables(dacScreenLED, dacBasler, dacIRLaser);
-    // Serial communication with VR PC to receive FlyOver data...
+    VRcontrol_VRPC.initializeDacVariables(dacScreenLED, dacBasler, dacOptLED);
+    // Serial communication with VR PC to receive FlyOver data via softwareSerial port
+    // set the data rate for the SoftwareSerial port
     Serial2.begin(baudrateArduino);
     Serial2.println("FlyOver to VR PC");
     Serial2.println();
   	
     //-------------------------------------------------------------
-    //Initialize screens, laser and Basler camera..................
+    //Initialize screens, opt. LED and Basler camera..................
     digitalWrite(LEDpin, HIGH);
-    analogWrite(dacIRLaser, 0);//Set the IR light to OFF
+    analogWrite(dacOptLED, 0);//Set the optogenetics LED to OFF
     stateScreens = VRcontrol_DataPC.screensOff(); //turn screens OFF
     stateBasler = VRcontrol_DataPC.baslerOff();
-    stateLaser = VRcontrol_DataPC.laserOff();
+    stateOpt = VRcontrol_DataPC.optLEDOff();
   }
   
   //==================================================================================================
@@ -115,22 +124,22 @@
 
       if(newCharRead > 0){
           String readTestVal; //
-          int reinforcementTestVal; //value to be passed on to red LED ('laser') during light intensity testing
+          int reinforcementTestVal; //value to be passed on to red LED during light intensity testing
           
           switch (in_DataPC){
             case 'c': // -->  initiate calibration
                 stateCalibration = 1;//performing calibration! Ignore input from VRPC
                 
-                //...if not already initiated and if nothing else is running (should be in dark with no laser)
-                if(!stateScreens && stateLaser==0 && !stateBasler){
+                //...if not already initiated and if nothing else is running (should be in dark with no optogenetic stimulation)
+                if(!stateScreens && stateOpt==0 && !stateBasler){
                     Serial.print("Calibration Activated");
                     VRcontrol_DataPC.performCalibration();
                     Serial.println("...by Data PC");
                 }
                 else{
                     Serial.println("Calibration was unsuccesful.");
-                    Serial.println("Turn off screens and laser and don't use Basler cameras.");
-                    Serial.print("stateLaser: ");Serial.println(stateLaser);
+                    Serial.println("Turn off screens and optLED and don't use Basler cameras.");
+                    Serial.print("stateOpt: ");Serial.println(stateOpt);
                     Serial.print("stateScreens: ");Serial.println(stateScreens);
                     Serial.print("stateBasler: ");Serial.println(stateBasler);
                 }
@@ -147,22 +156,22 @@
                 }else{stateBasler = VRcontrol_DataPC.baslerOff();}
                 break;
                 
-            case 'i': // --> turn on the IR laser
-                if(stateLaser == 0){
-                    Serial3.println("Laser On");
-                    stateLaser = VRcontrol_DataPC.laserOn(laserTest_dutyCycle);
-                }else{ stateLaser = VRcontrol_DataPC.laserOff();}
+            case 'i': // --> turn the optogenetics LED on (to test duty cycle)
+                if(stateOpt == 0){
+                    Serial3.println("Optogenetics LED On");
+                    stateOpt = VRcontrol_DataPC.optLEDOn(optLEDTest_dutyCycle);
+                }else{ stateOpt = VRcontrol_DataPC.optLEDOff();}
                 break;
                 
             case 'k':    //breakout based on DataPC input
                 stateFlyOverTrial = 0;
                 stateScreens = VRcontrol_DataPC.screensOff();
-                stateLaser = VRcontrol_DataPC.laserOff();
+                stateOpt = VRcontrol_DataPC.optLEDOff();
                 Serial.println("trial terminated by DataPC input");
                 Serial.println("XXX");
                 break;
             
-            case 'r':    //set red LED ('laser') output to a certain test value
+            case 'r':    //set red LED output to a certain test value
                 // read in reinforcementTestVal
                 in_DataPC = Serial.read();
                 readTestVal += in_DataPC; //makes the string currLine
@@ -177,7 +186,7 @@
                 reinforcementTestVal = atoi(charBuf);
                 charBuf[0] = '\0';
                 
-                stateLaser = VRcontrol_DataPC.laserOn(reinforcementTestVal);
+                stateOpt = VRcontrol_DataPC.optLEDOn(reinforcementTestVal);
                 break;
             
             default: //invalid input
@@ -220,7 +229,7 @@
                   //FlyOver trial is over
                   stateFlyOverTrial = 0;
                   stateScreens = VRcontrol_DataPC.screensOff();
-                  stateLaser = VRcontrol_DataPC.laserOn(0); //stateLaser = VRcontrol_DataPC.laserOff();
+                  stateOpt = VRcontrol_DataPC.optLEDOn(0);
                   Serial.println("Trial terminated by FlyOver");
                   Serial.println("XXX");//termination sequence for SerialLogger.exe
                   VRcontrol_DataPC.dac2Write(2, 0);// set the DAC output to low
@@ -247,7 +256,7 @@
               charBuf[0] = '\0';
               
               //switch red light on:
-              stateLaser = VRcontrol_DataPC.laserOn(reinforcementVal);
+              stateOpt = VRcontrol_DataPC.optLEDOn(reinforcementVal);
               
               //send F0_time, FO_xPos, FO_yPos, Arduino_time, PWM_val
               Serial.print(millis());Serial.print(',');

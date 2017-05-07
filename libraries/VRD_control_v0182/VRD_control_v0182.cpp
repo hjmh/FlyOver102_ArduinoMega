@@ -1,10 +1,8 @@
 /*
  *  VRD_control_v0182.h
  *  
- *
  *  Created by Hannah Haberkern on 4/5/12.
- *  Copyright 2012 ETH Zürich. All rights reserved.
- *  Updated 19/11/2015 by Hannah
+ *  Updated 07/05/2017 by Hannah Haberkern
  *
  */
 
@@ -17,7 +15,7 @@
 
 //===============
 //Constructor
-VRD_control::VRD_control(long timeOutInterval, int dacScreenLED, int dacBasler, int dacIRLaser, int calibrationPeriod_Hz, int calibrationPulseTime, int dac2pin)
+VRD_control::VRD_control(long timeOutInterval, int dacScreenLED, int dacBasler, int dacOptLED, int calibrationPeriod_Hz, int calibrationPulseTime, int dac2pin)
 {
 	_timeOutInterval = timeOutInterval; //interval w/o input after which outputs are truned off
 	_timeOutTimer = 0;
@@ -25,7 +23,7 @@ VRD_control::VRD_control(long timeOutInterval, int dacScreenLED, int dacBasler, 
 	
 	_dacScreenLED = dacScreenLED;
 	_dacBasler = dacBasler;
-	_dacIRLaser = dacIRLaser;
+	_dacOptLED = dacOptLED;
 	
 	_calibrationPeriod_Hz = calibrationPeriod_Hz;
 	_calibrationPulseTime = calibrationPulseTime;
@@ -37,11 +35,11 @@ VRD_control::VRD_control(long timeOutInterval, int dacScreenLED, int dacBasler, 
 //===============
 //Public functions
 
-void VRD_control::initializeDacVariables(int dacScreenLED, int dacBasler, int dacIRLaser)
+void VRD_control::initializeDacVariables(int dacScreenLED, int dacBasler, int dacOptLED)
 {
 	_dacScreenLED = dacScreenLED;
 	_dacBasler = dacBasler;
-	_dacIRLaser = dacIRLaser;
+	_dacOptLED = dacOptLED;
 }
 
 
@@ -92,19 +90,19 @@ int VRD_control::baslerOff()
 
 //---------------
 
-int VRD_control::laserOn(int dutyCycle)
+int VRD_control::optLEDOn(int dutyCycle)
 {
 	// range of laser duty cycle is from 0 - 255
 	//int PMWval = (int) (dutyCycle*255)/100.0; //The variable dutyCycle defines the duty cycle in %
 	int PMWval = (int) dutyCycle;
-	analogWrite(_dacIRLaser, PMWval);//Set the PWM to high, pretty much 5 volts
+	analogWrite(_dacOptLED, PMWval);//Set the PWM to high, pretty much 5 volts
 	
-	return 1; //state LASER=ON
+	return 1; //state LASER_ON
 }
 
-int VRD_control::laserOff()
+int VRD_control::optLEDOff()
 {
-	analogWrite(_dacIRLaser, 0);
+	analogWrite(_dacOptLED, 0);
 	return 0; //state LASER_OFF	
 }
 
