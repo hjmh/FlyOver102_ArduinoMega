@@ -6,7 +6,7 @@
    *      - Arduino receives reduced data stream (at about 360Hz) containing positional information
    *          of fly in the VR as well as event information
    *      - Arduino parses though this input stream, initiates adequate optogenetics stimulus (optLED) and outputs
-   *          initiated stimulation events to the second serial connection (-> PC2, Serial logger))
+   *          initiated stimulation events to the second serial connection (-> Data PC, Serial logger))
    *
    *  Created by Hannah Haberkern on 14/12/15, updated 2017.
    *
@@ -15,12 +15,9 @@
   #ifndef VRD_ArduinoMain_h
   #define VRD_ArduinoMain_h
   #include <SPI.h>// include the SPI library code
-  //#include <SoftwareSerial.h>
   #include <VRD_setup_v0182.h> // include library for setting up the communication etc.
   #include <VRD_control_v0182.h> // include library for control of VR setup
   #include <VRD_Arduino_ExpParams.h> // include parameter declarations and initializations
-
-  // #define sbi(sfr, bit) (_SFR_BYTE(sfr) |= _BV(bit))
   
   //Define constants to be used later in the experiment
   #define CALIBRATION_HZ 500.00 //Hz of your frame trigger pulses
@@ -43,17 +40,6 @@
   
   int newCharRead = 0;
   
-  //----------------------------------------------------------------------
-  // Choose pins for software serials (Serial2 and Serial3)
-  //----------------------------------------------------------------------
-  /* Note: Not all pins on the Mega and Mega 2560 support change interrupts, so only the following can be used for RX:
-           10, 11, 12, 13, 50, 51, 52, 53, 62, 63, 64, 65, 66, 67, 68, 69
-  int rx_Serial2 = 10; // RX is digital pin 10 (connect to TX of other device)
-  int tx_Serial2 = 9; // TX is digital pin 9 (connect to RX of other device)
-  int rx_Serial3 = 12;
-  int tx_Serial3 = 11;
-  */
-  
   //==================================================================================================
   // Instanciate objects from VRsetup class and VRcontrol class
   
@@ -66,9 +52,9 @@
     /* Set up
        - Arduino pins
        - Serial communication (3 serials):
-           --> with the VRPC (FO input)
-           --> with DataPC (Matlab communication during calibration)
-           --> with DataPC (Serial logger to write Arduino event data to file)
+           --> with the VRPC (FO input --> Serial2)
+           --> with DataPC (debugging, Matlab communication during calibration --> Serial)
+           --> with DataPC (Serial logger to write Arduino event data to file --> Serial or Serial3 (the latter is not currently implemented))
        - intialize Basler, optogenetics LED, screens
        - set a couple of boolean flags..
     */
@@ -115,7 +101,7 @@
   
   void loop() {
       //----------------------------------------------------------------------
-      //check if there is input from Matlab on DataPC (Serial3)
+      //check if there is input from Matlab on DataPC (Serial1)
       if (Serial.available()){//input from Matlab/Serial monitor
           in_DataPC = Serial.read();
           Serial.println(in_DataPC);
@@ -158,7 +144,7 @@
                 
             case 'i': // --> turn the optogenetics LED on (to test duty cycle)
                 if(stateOpt == 0){
-                    Serial3.println("Optogenetics LED On");
+                    Serial.println("Optogenetics LED On");
                     stateOpt = VRcontrol_DataPC.optLEDOn(optLEDTest_dutyCycle);
                 }else{ stateOpt = VRcontrol_DataPC.optLEDOff();}
                 break;
@@ -203,7 +189,7 @@
       //----------------------------------------------------------------------
       //check if there is input from FlyOver on VRPC (Serial2)
       if (Serial2.available()){//input from FlyOver
-          stateFlyOverTrial = 1;//trial initiated, now ignore further input from DataPC via Matlab (Serial3)
+          stateFlyOverTrial = 1;//trial initiated, now ignore further input from DataPC via Matlab (Serial)
           if(!stateScreens){
               stateScreens = VRcontrol_DataPC.screensOn();
               //VRcontrol_DataPC.beginRecordingTrialVideo(20, 5000);
