@@ -39,6 +39,8 @@
   int stateFlyOverTrial = 0; //is currently an experiment running?
   
   int newCharRead = 0;
+
+  long FOtrialT;
   
   //==================================================================================================
   // Instanciate objects from VRsetup class and VRcontrol class
@@ -76,7 +78,7 @@
     //Serial port for sending out data to Data PC (to be looged by SerialLogger.exe)
     //  --> this is a more reliable way of logging Arduino data and should be used during trials
     Serial.begin(baudrateArduino); // --> COM10
-    Serial.println("FlyOver to Data PC");
+    Serial.println("Arduino to Data PC");
   	
     //-------------------------------------------------------------
     //VR PC control................................................
@@ -85,8 +87,7 @@
     // Serial communication with VR PC to receive FlyOver data via softwareSerial port
     // set the data rate for the SoftwareSerial port
     Serial2.begin(baudrateArduino);
-    Serial2.println("FlyOver to VR PC");
-    Serial2.println();
+    Serial2.println("Arduino to VR PC");
   	
     //-------------------------------------------------------------
     //Initialize screens, opt. LED and Basler camera..................
@@ -103,9 +104,11 @@
       //----------------------------------------------------------------------
       //check if there is input from Matlab on DataPC (Serial1)
       if (Serial.available()){//input from Matlab/Serial monitor
-          in_DataPC = Serial.read();
-          Serial.println(in_DataPC);
-          newCharRead = 1;
+          char in_DataPC = Serial.read();
+          if(in_DataPC != 10 & in_DataPC != 13){
+              newCharRead = 1;
+              Serial.println( (char) in_DataPC);
+          }
       }
 
       if(newCharRead > 0){
@@ -133,8 +136,13 @@
                 break;
                 
             case 's': // --> turn on sugar cubes (projector lamps)
-                if(!stateScreens){ stateScreens = VRcontrol_DataPC.screensOn();
-                }else{ stateScreens = VRcontrol_DataPC.screensOff();}
+                if(!stateScreens){
+                    stateScreens = VRcontrol_DataPC.screensOn();
+                    Serial.println("Screens on");
+                }else{
+                    stateScreens = VRcontrol_DataPC.screensOff();
+                    Serial.println("Screens off");
+                }
                 break;
                 
             case 'b': // --> turn on Basler camera
@@ -144,9 +152,12 @@
                 
             case 'i': // --> turn the optogenetics LED on (to test duty cycle)
                 if(stateOpt == 0){
-                    Serial.println("Optogenetics LED On");
+                    Serial.println("Optogenetics LED on");
                     stateOpt = VRcontrol_DataPC.optLEDOn(optLEDTest_dutyCycle);
-                }else{ stateOpt = VRcontrol_DataPC.optLEDOff();}
+                }else{
+                    stateOpt = VRcontrol_DataPC.optLEDOff();
+                    Serial.println("Optogenetics LED off");
+                }
                 break;
                 
             case 'k':    //breakout based on DataPC input
@@ -159,27 +170,15 @@
             
             case 'r':    //set red LED output to a certain test value
                 // read in reinforcementTestVal
-                in_DataPC = Serial.read();
-                readTestVal += in_DataPC; //makes the string currLine
-                while (in_DataPC != '\n') {
-                    in_DataPC = Serial.read();  //gets one byte from serial buffer
-                    readTestVal += in_DataPC; //makes the string currLine
-                }//endwhile
-
+                readTestVal =  Serial.readString();
                 Serial.println(readTestVal);
-                char charBuf[100];
-                readTestVal.toCharArray(charBuf, 100); 
-                reinforcementTestVal = atoi(charBuf);
-                charBuf[0] = '\0';
                 
+                reinforcementTestVal = readTestVal.toInt();
                 stateOpt = VRcontrol_DataPC.optLEDOn(reinforcementTestVal);
                 break;
-            
+         
             default: //invalid input
-                if(Serial.available()== 0){
-                    Serial.print("Invalid input from Data PC: ");
-                    Serial.println(in_DataPC);
-                }
+                Serial.print("Invalid input from Data PC!");
                 break;
           }
           newCharRead = 0;
@@ -192,23 +191,17 @@
           stateFlyOverTrial = 1;//trial initiated, now ignore further input from DataPC via Matlab (Serial)
           if(!stateScreens){
               stateScreens = VRcontrol_DataPC.screensOn();
-              //VRcontrol_DataPC.beginRecordingTrialVideo(20, 5000);
-              //initiate video recording with basler camera
           }
+          FOtrialT = millis();
       }
       
       while (stateFlyOverTrial) {
-        //now enter keep reading data from Serial2, exit when termination character is read
+        //now keep reading data from Serial2, exit when termination character is read
           if (Serial2.available()){//read one line from FlyOver input
-  	      String currLine; int posInLine = 0; int currComma = 0;
-              char in_VRPC;
-              in_VRPC = Serial2.read();
-              currLine += in_VRPC; //makes the string currLine
-              while (in_VRPC != '\n') {
-                  in_VRPC = Serial2.read();  //gets one byte from serial buffer
-                  currLine += in_VRPC; //makes the string currLine
-              }//endwhile
-              //finished reading a line, now start parsing through and processing it
+              String currLine = String();
+              
+              currLine = Serial2.readStringUntil('\n');
+              //Serial.println(currLine);
               
               //teminate session when termination sequence is read ("Trial_Ended")
               if (currLine.indexOf(FO_terminationString)!=-1) {
@@ -219,35 +212,27 @@
                   Serial.println("Trial terminated by FlyOver");
                   Serial.println("XXX");//termination sequence for SerialLogger.exe
                   VRcontrol_DataPC.dac2Write(2, 0);// set the DAC output to low
-                  
                   break;
               }//endif (termination of trial)
-              
-              
+             
               //expected format of data from FlyOver:
               // FO_time, reinforcementVal
-              String readString;
-              char charBuf[100]; //to read in FO data
               
-              currComma = currLine.indexOf(',', 0);
-              String FO_time = currLine.substring(0, currComma-1);
-              posInLine = currComma+1;
+              int commapos = currLine.indexOf(',', 0);
+              String FO_time = currLine.substring(0, commapos);
               
-              //now read events:
-              currComma = currLine.indexOf(',', posInLine);
-              readString = currLine.substring(posInLine, currComma-1);
-              readString.toCharArray(charBuf, 100); 
-              int reinforcementVal = atoi (charBuf);
-              posInLine = currComma+1;
-              charBuf[0] = '\0';
-              
-              //switch red light on:
+              //now read reinforcement value and set red LED:
+              String readRVal = currLine.substring(commapos+1);
+              int reinforcementVal = readRVal.toInt();
               stateOpt = VRcontrol_DataPC.optLEDOn(reinforcementVal);
               
-              //send F0_time, FO_xPos, FO_yPos, Arduino_time, PWM_val
-              Serial.print(millis());Serial.print(',');
-              Serial.print(FO_time);Serial.print(',');
-              Serial.print(reinforcementVal);Serial.print(',');
+              //send Arduino_time, F0_time, PWM_val  
+              // --> currenly goes to Serial, could be changed to go to Serial3 (dedicated to data logging)
+              Serial.print(millis()-FOtrialT);
+              Serial.print(',');
+              Serial.print(FO_time);
+              Serial.print(',');
+              Serial.print(reinforcementVal);
               Serial.print('\n');
               
           }//endif (data stream from FlyOver)
